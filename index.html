@@ -1891,15 +1891,15 @@ function sounds(now) {
   const space = smooth(700, 1300, y) * (1 - smooth(CB[0] - 120, CB[0] + 120, yc));
   const spirit = smooth(VIR.a1 - 60, VIR.a1 + 320, y) * (1 - inGoloka);
   setLoop("amb-garden-dawn", .85 * garden);
-  setLoop("amb-cosmos", Math.max(.95 * space, .35 * inCov));                          // travelling through the universe
-  setLoop("amb-coverings", .95 * inCov);                                              // one sound for piercing all the coverings…
+  setLoop("amb-cosmos", Math.max(.6 * space, .25 * inCov));                           // travelling through the universe, kept under the flute
+  setLoop("amb-coverings", .55 * inCov);                                              // one sound for piercing all the coverings…
   { const L = Loops["amb-coverings"]; if (L && L.f) { const pc = clamp((yc - CB[0]) / (VIR.a0 - CB[0])); L.f.frequency.setTargetAtTime(240 * Math.pow(2, 5.6 * pc), Snd.ctx.currentTime, .35); } }   // …opening and brightening as it rises
   setLoop("amb-river", .9 * Math.exp(-Math.pow((y - VIR.mid) / 300, 2)));
   setLoop("amb-spiritual", .9 * spirit);                                              // the brahmajyoti and the Vaikuṇṭha sky
   setLoop("amb-vedic", .7 * spirit);                                                  // Vedic chant, used as soon as the recording exists
   setLoop("amb-goloka", .8 * inGoloka);
-  // your bansuri carries the whole journey: fullest in the garden and Goloka, softer above the earth
-  setLoop("loop-flute", (S.close > .5 ? .85 : 1) * (.55 * garden + .28 * space + .18 * inCov + .42 * spirit + .7 * inGoloka));
+  // your bansuri carries the whole journey and is never pushed down: the whooshes ride on top of it
+  setLoop("loop-flute", (S.close > .5 ? .85 : 1) * (.58 + .12 * inGoloka));
   if (now > nextCall) {
     nextCall = now + rr(14, 30);
     const inGarden = y < 900, inGol = y > 6800, k = rnd();
@@ -1907,17 +1907,17 @@ function sounds(now) {
     else if (inGol) oneShot(k < .3 ? "sfx-cow-2" : k < .5 ? "sfx-cow-1" : k < .75 ? "sfx-peacock-1" : "sfx-peacock-2", .5, 1, rr(-.5, .5));
   }
 }
-// rising up the rāga (Sa Re Ga Pa Dha Sa' Re' Ga') as each covering is pierced
-const PIERCE_RATE = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2, 9 / 4, 5 / 2];
+// each covering is pierced with a rushing whoosh, a little brighter each time as the creeper rises
+const PIERCE_RATE = [1, 1.04, 1.09, 1.13, 1.18, 1.23, 1.29, 1.35];
 let lastPierceSnd = 0;
 function onPierce(d) {
   if (!Snd.on || !tr || tr.done || tr.mode !== "play") return;
   const now = performance.now() / 1000; if (now - lastPierceSnd < .35) return; lastPierceSnd = now;
   const bi = BANDS.indexOf(d), pan = clamp(d.px / 600, -.6, .6);
-  if (bi >= 0) { oneShot("sfx-pierce", .7, PIERCE_RATE[bi], pan); oneShot("sfx-thrust", .45 - bi * .03, 1, 0); }   // the bell toll climbs the rāga; a low push beneath
+  if (bi >= 0) { oneShot("sfx-pierce", 1, PIERCE_RATE[bi], pan); oneShot("sfx-thrust", .28, 1, 0); }                // a rushing whoosh through each covering; a low push beneath
   else if (d === VBAND) oneShot("sfx-light", .85, 1, 0);                                                             // across the Virajā into the light
   else if (d === VBAND2) {}
-  else oneShot("sfx-whoosh", .7, .92 + Math.random() * .16, pan);                     // a loka ring
+  else oneShot("sfx-whoosh", 1, .92 + Math.random() * .16, pan);                      // a loka ring
 }
 let ftEma = 1 / 60, slowFor = 0;
 function frame() {
