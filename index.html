@@ -884,13 +884,15 @@ function drawMirrors() {
   if (VB.b < g.top - g.h) {
     // below the garden: the flowering foreground continues (mirrored), then sinks into shadow
     const bot = g.top - g.h, im = IM.garden, sh = im.height * .15, dh = g.h * .15;
-    ctx.save(); ctx.translate(g.x0, bot); ctx.drawImage(im, 0, im.height - sh, im.width, sh, 0, -dh, g.w, dh); ctx.scale(1, -1); ctx.drawImage(im, 0, im.height - sh, im.width, sh, 0, dh, g.w, dh); ctx.restore();
-    const gr = ctx.createLinearGradient(0, bot, 0, bot - 2 * dh); gr.addColorStop(0, "rgba(8,10,6,.1)"); gr.addColorStop(.5, "rgba(8,10,6,.55)"); gr.addColorStop(1, "rgba(8,10,6,1)");
-    ctx.fillStyle = gr; ctx.fillRect(g.x0, bot - 2 * dh - 1, g.w, 2 * dh + 2); ctx.fillStyle = "#080a06"; ctx.fillRect(g.x0, A_MIN - 10, g.w, bot - 2 * dh - A_MIN + 12);
+    // four alternating copies (mirrored, upright…) so tall phone screens see flowers all the way down
+    const NS = 4;
+    for (let k = 0; k < NS; k++) { ctx.save(); ctx.translate(g.x0, bot - k * dh); if (k % 2) { ctx.scale(1, -1); ctx.drawImage(im, 0, im.height - sh, im.width, sh, 0, 0, g.w, dh); } else ctx.drawImage(im, 0, im.height - sh, im.width, sh, 0, -dh, g.w, dh); ctx.restore(); }
+    const gr = ctx.createLinearGradient(0, bot, 0, bot - NS * dh); gr.addColorStop(0, "rgba(8,10,6,.05)"); gr.addColorStop(.5, "rgba(8,10,6,.4)"); gr.addColorStop(1, "rgba(8,10,6,1)");
+    ctx.fillStyle = gr; ctx.fillRect(g.x0, bot - NS * dh - 1, g.w, NS * dh + 2); ctx.fillStyle = "#080a06"; ctx.fillRect(g.x0, A_MIN - 10, g.w, bot - NS * dh - A_MIN + 12);
   }
   if (VB.t > t.top && IM.goloka && IM.goloka.width) {
     ctx.save(); ctx.translate(t.x0, t.top); ctx.drawImage(IM.goloka, 0, 0, t.w, t.h); ctx.restore();
-    const gr = ctx.createLinearGradient(0, t.top, 0, t.top + 800); gr.addColorStop(0, "rgba(12,14,40,.3)"); gr.addColorStop(1, "rgba(9,10,32,.97)");
+    const gr = ctx.createLinearGradient(0, t.top, 0, t.top + 900); gr.addColorStop(0, "rgba(12,14,40,0)"); gr.addColorStop(.45, "rgba(12,14,40,.55)"); gr.addColorStop(1, "rgba(9,10,32,.97)");
     ctx.fillStyle = gr; ctx.fillRect(t.x0, t.top, t.w, t.h); ctx.fillStyle = "#090a20"; ctx.fillRect(t.x0, t.top + t.h - 2, t.w, A_MAX - t.top);
   }
 }
@@ -1088,7 +1090,7 @@ function frameFor(i, st) {
   return { x: 0, y: 0, h: 900, w: 1300 };
 }
 let ov = 0, ovTarget = 0, ovT0 = 0, panX = 0, panY = 0, zoomK = 1, settle = false, intro = reduced ? 1 : 0, introFast = false;
-let W = 1, H = 1, DPR = 1, free = { l: 0, r: 1, t: 0, b: 1 }, K = 1, FCX = 0, FCY = 0;
+let W = 1, H = 1, DPR = 1, free = { l: 0, r: 1, t: 0, b: 1 }, cam = { l: 0, r: 1, t: 0, b: 1 }, K = 1, FCX = 0, FCY = 0;
 const FLY = 30;   // seconds for the whole-journey flight
 function flyFrame(now) { const u = easeIO(clamp((now - ovT0) / FLY)); return { x: lerp(0, -170, smooth(.85, 1, u)), y: lerp(40, GL + 205, u), h: 820, w: 1300 }; }
 
@@ -1806,7 +1808,9 @@ function layout() {
   const dockTop = dock.offsetTop - 8;
   if (narrow) free = { l: 0, r: W, t: 0, b: Math.max(H * .3, panelOpen ? card.offsetTop - 8 : dockTop) };
   else free = { l: 0, r: panelOpen ? Math.max(W * .45, card.offsetLeft - 12) : W, t: 0, b: Math.max(H * .5, dockTop) };
-  TFX = (free.l + free.r) / 2; TFY = (free.t + free.b) / 2;
+  // the camera frames the whole screen above the controls; opening the details panel never reframes or zooms the scene
+  cam = { l: 0, r: W, t: 0, b: Math.max(H * .5, dockTop) };
+  TFX = W / 2; TFY = (cam.t + cam.b) / 2;
   if (!FCX) { FCX = TFX; FCY = TFY; }
   $("#ui").style.setProperty("--fcx", TFX + "px"); $("#ui").style.setProperty("--fcy", TFY + "px");
 }
@@ -1957,13 +1961,14 @@ function frame() {
   // the paintings always cover the whole screen: never zoom out past the painting width, never show an edge
   const kMin = 2 * Math.max(FCX, W - FCX) / WW;
   // on portrait screens the paintings may be cropped at the sides rather than shrunk to a strip
-  const portrait = (free.r - free.l) < (free.b - free.t) * .9, wf = portrait ? 1.65 : 1;
-  K = Math.max(kMin, Math.min((free.b - free.t) / f.h, (free.r - free.l) / f.w * wf) * zoomK);
+  // always show the full width of the paintings, on any screen and in any orientation; only the offering close-up zooms in
+  const kFrame = Math.min((cam.b - cam.t) / f.h, (cam.r - cam.l) / f.w), zc = cur === 9 && ov < .5 ? easeS(S.close) : 0;
+  K = Math.max(kMin, Math.exp(lerp(Math.log(kMin), Math.log(Math.max(kMin, kFrame)), zc)) * zoomK);
   let vx = f.x + panX, vy = f.y + panY;
   const xLo = -WW / 2 + FCX / K, xHi = WW / 2 - (W - FCX) / K; vx = clamp(vx, Math.min(xLo, xHi), Math.max(xLo, xHi));
   const yLo = A_MIN + (H - FCY) / K, yHi = A_MAX - FCY / K; vy = clamp(vy, yLo, yHi);
   // never show more than a strip of flowers below the garden painting (tall phone screens)
-  { const GB = PL[0].top - PL[0].h - 110, need = GB + (H - FCY) / K; if (vy < need && need < yHi) vy = need; }
+  { const GB = PL[0].top - PL[0].h - 110, need = GB + (cam.b - FCY) / K; if (vy < need && need < yHi) vy = need; }
   panX = vx - f.x; panY = vy - f.y;
   view.x = vx; view.y = vy; view.h = f.h; view.w = f.w;
   // playback controls
